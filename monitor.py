@@ -17,6 +17,11 @@ Optional:
     STATE_FILE            path to state file (default: state.json)
     COURSES_FILE          path to course config (default: courses.json)
 
+Usage:
+    python monitor.py                      check watchlist, notify on changes
+    python monitor.py --list CS 479        list every section of a course
+    python monitor.py --list CS 479 --raw  same, as raw JSON
+
 Stdlib only -- no pip install needed.
 """
 
@@ -244,6 +249,121 @@ def save_json(path, obj):
         json.dump(obj, f, indent=2, sort_keys=True)
 
 
+# ------------------------------------------------------------------ --list
+
+
+def meeting_summary(rec):
+    """
+    Best-effort "days time instructor" for a section.
+
+    The nested schedule object is the least predictable part of the response,
+    so every lookup is tolerant and the whole thing degrades to "" rather than
+    raising -- `--list` is a diagnostic tool and must never be the thing that
+    breaks. Use --raw when this comes back empty.
+    """
+    data = pick(rec, ["scheduledata", "schedule", "meetings"]) or []
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return ""
+
+    def hhmm(v):
+        s = str(v or "")
+        return s[11:16] if "T" in s else s[:5]
+
+    slots, instructors = [], []
+    for m in data:
+        if not isinstance(m, dict):
+            continue
+        days = pick(m, ["classmeetingdaypatterncode", "daypattern", "days"]) or ""
+        start = hhmm(pick(m, ["classmeetingstarttime", "starttime"]))
+        end = hhmm(pick(m, ["classmeetingendtime", "endtime"]))
+        window = f"{start}-{end}" if start and end else start or end
+        slot = " ".join(p for p in [str(days), window] if p).strip()
+        if slot and slot not in slots:
+            slots.append(slot)
+
+        people = pick(m, ["instructordata", "instructors"]) or []
+        if isinstance(people, dict):
+            people = [people]
+        for person in people if isinstance(people, list) else []:
+            if isinstance(person, dict):
+                first = pick(person, ["instructorfirstname", "firstname"]) or ""
+                last = pick(person, ["instructorlastname", "lastname"]) or ""
+                name = f"{first} {last}".strip() or str(
+                    pick(person, ["instructor", "name"]) or "")
+            else:
+                name = str(person)
+            if name and name not in instructors:
+                instructors.append(name)
+
+    out = "; ".join(slots[:2])
+    if instructors:
+        out = f"{out}  {', '.join(instructors[:2])}".strip()
+    return out
+
+
+def list_sections(argv):
+    """Dump every section of one course, so you can find section numbers."""
+    usage = "usage: python monitor.py --list SUBJECT CATALOG [--raw]"
+    argv = [str(a) for a in argv]
+    positional = [a for a in argv if not a.startswith("--")]
+    if len(positional) < 2:
+        raise SystemExit(usage)
+
+    api_key = os.environ.get("UW_API_KEY")
+    if not api_key:
+        raise SystemExit("UW_API_KEY is not set")
+
+    subject, catalog = positional[0].upper(), str(positional[1])
+
+    # Term comes from courses.json so it stays in one place; TERM_CODE
+    # overrides for a one-off lookup in a different term.
+    config = load_json(os.environ.get("COURSES_FILE", "courses.json"), {}) or {}
+    term = str(os.environ.get("TERM_CODE") or config.get("term") or "").strip()
+    if not term:
+        raise SystemExit('No term found: set TERM_CODE or add "term" to courses.json')
+
+    raw = api_get(f"/ClassSchedules/{term}/{subject}/{catalog}", api_key)
+
+    if "--raw" in argv:
+        print(json.dumps(raw, indent=2, sort_keys=True))
+        return 0
+
+    if isinstance(raw, dict):
+        raw = [raw]
+    if not isinstance(raw, list) or not raw:
+        print(f"No sections returned for {subject} {catalog} in term {term}.")
+        return 1
+
+    print(f"\n{subject} {catalog}  --  term {term}  --  {len(raw)} section(s)\n")
+    head = f"{'SECTION':<9}{'COMP':<7}{'CLASS#':<9}{'SEATS':<11}WHEN / WHO"
+    print(head)
+    print("-" * max(len(head), 60))
+
+    for rec in raw:
+        if not isinstance(rec, dict):
+            continue
+        cap = pick(rec, CAPACITY_KEYS)
+        enr = pick(rec, ENROLLED_KEYS)
+        section = pick(rec, SECTION_KEYS)
+        seats = "?"
+        if cap is not None and enr is not None:
+            try:
+                free = int(cap) - int(enr)
+                seats = f"{enr}/{cap}" + (f" +{free}" if free > 0 else "")
+            except (TypeError, ValueError):
+                seats = f"{enr}/{cap}"
+        print(f"{str(section or '?'):<9}"
+              f"{str(pick(rec, COMPONENT_KEYS) or '?'):<7}"
+              f"{str(pick(rec, CLASSNUM_KEYS) or '?'):<9}"
+              f"{seats:<11}{meeting_summary(rec)}")
+
+    print('\nPut the SECTION values you want in courses.json under "sections".')
+    print("Run with --raw to see the full JSON (useful if columns show '?').")
+    return 0
+
+
 # ---------------------------------------------------------------------- main
 
 
@@ -319,7 +439,13 @@ def main():
 
             key = sec["key"]
             open_now = sec["open_seats"] > 0
-            was_open = old_state.get(key, {}).get("open", False)
+            prev = old_state.get(key, {})
+            was_open = prev.get("open", False)
+            was_seats = prev.get("open_seats", 0)
+            # Shown in the alert so "newly open" reads differently from
+            # "more seats than last time".
+            sec["prev_open_seats"] = was_seats
+            sec["first_seen"] = not prev
 
             new_state[key] = {
                 "open": open_now,
@@ -332,7 +458,11 @@ def main():
             print(f"  {sec['section']:<6} {sec['enrolled']}/{sec['capacity']}"
                   f"  {status}", file=sys.stderr)
 
-            if open_now and (not was_open or always_notify):
+            # Notify on any *increase* in open seats, not just the full -> open
+            # transition. Catches reserved-seat blocks being released, which
+            # can show up as either enrolled dropping or capacity rising.
+            more_seats = sec["open_seats"] > was_seats
+            if open_now and (not was_open or more_seats or always_notify):
                 newly_open.append(sec)
             elif was_open and not open_now and notify_on_close:
                 newly_closed.append(sec)
@@ -351,10 +481,18 @@ def main():
     if newly_open:
         embeds = []
         for sec in newly_open:
+            prev_seats = sec.get("prev_open_seats", 0)
+            if sec.get("first_seen"):
+                headline = f"**{sec['open_seats']} seat(s) open**"
+            elif prev_seats == 0:
+                headline = f"**{sec['open_seats']} seat(s) open** (was full)"
+            else:
+                headline = (f"**{sec['open_seats']} seat(s) open** "
+                            f"(was {prev_seats})")
             embeds.append({
                 "title": f"{sec['key']}",
                 "description": (
-                    f"**{sec['open_seats']} seat(s) open**\n"
+                    f"{headline}\n"
                     f"Enrolled: {sec['enrolled']} / {sec['capacity']}\n"
                     f"Component: {sec['component'] or 'n/a'}\n"
                     f"Class number: `{sec['class_number']}`"
@@ -399,4 +537,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--list" in sys.argv:
+        idx = sys.argv.index("--list")
+        sys.exit(list_sections(sys.argv[idx + 1:]))
     sys.exit(main())

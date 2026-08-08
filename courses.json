@@ -5,12 +5,32 @@
     {
       "subject": "CS",
       "catalog": "479",
+      "sections": ["001", "002"]
+    },
+    {
+      "subject": "EARTH",
+      "catalog": "122",
+      "sections": ["081"]
+    },
+    {
+      "subject": "FINE",
+      "catalog": "100",
+      "sections": ["002", "003"]
+    },
+    {
+      "subject": "CS",
+      "catalog": "456",
+      "sections": ["001"]
+    },
+    {
+      "subject": "CS",
+      "catalog": "484",
       "sections": ["001"]
     },
     {
       "subject": "CS",
       "catalog": "486",
-      "sections": ["001", "002"]
+      "sections": ["002"]
     }
   ]
 }
