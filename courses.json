@@ -4,7 +4,8 @@
   "courses": [
     {
       "subject": "CS",
-      "catalog": "479"
+      "catalog": "479",
+      "sections": ["001"]
     },
     {
       "subject": "CS",

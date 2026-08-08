@@ -68,6 +68,24 @@ def pick(record, candidates):
     return None
 
 
+def section_label(value):
+    """
+    Normalize a section label for comparison.
+
+    The API may report section 1 as 1, "1", or "001" depending on the field,
+    so compare on a canonical form. Non-numeric labels (rare, but e.g. "A01")
+    fall back to a cased-and-stripped string.
+    """
+    s = str(value).strip().upper()
+    return s.lstrip("0") or "0" if s.isdigit() else s
+
+
+def section_matches(value, wanted):
+    """True if `value` matches any entry in the `wanted` list, tolerantly."""
+    target = section_label(value)
+    return any(section_label(w) == target for w in wanted)
+
+
 def api_get(path, api_key, max_retries=3):
     """GET from the Open Data API with backoff on rate limits."""
     url = f"{BASE}{path}"
@@ -255,6 +273,7 @@ def main():
     newly_open = []
     newly_closed = []
     errors = []
+    config_warnings = []
 
     for course in watchlist:
         subject = course["subject"].upper()
@@ -280,8 +299,22 @@ def main():
                     new_state[k] = v
             continue
 
+        if wanted:
+            available = [s["section"] for s in sections]
+            missing = [w for w in wanted
+                       if not any(section_matches(a, [w]) for a in available)]
+            if missing:
+                # Silently watching nothing looks identical to "no seats open",
+                # so make a bad section filter loud.
+                msg = (f"section(s) {missing} not found for {label}. "
+                       f"API reports: {available}")
+                print(f"  WARNING: {msg}", file=sys.stderr)
+                # Not an `error`: this is a config mistake that persists every
+                # run, so it must not spam Discord hourly or fail the job.
+                config_warnings.append(f"**{label}**: {msg}")
+
         for sec in sections:
-            if wanted and sec["section"] not in wanted:
+            if wanted and not section_matches(sec["section"], wanted):
                 continue
 
             key = sec["key"]
@@ -307,6 +340,9 @@ def main():
         # Be polite between courses.
         time.sleep(1)
 
+    # Reserved key -- never collides with a section key ("SUBJ CAT SEC (NUM)").
+    prior_warnings = old_state.get("_config_warnings", [])
+    new_state["_config_warnings"] = config_warnings
     save_json(state_file, new_state)
 
     # ------------------------------------------------------------- notify
@@ -337,6 +373,15 @@ def main():
             "footer": {"text": now},
         } for sec in newly_closed]
         post_discord(webhook, "Section closed.", embeds)
+
+    # Only ping when the warning set changes, so a standing config mistake
+    # doesn't repost every hour.
+    if config_warnings and config_warnings != prior_warnings:
+        post_discord(
+            webhook,
+            ":grey_question: Check your courses.json:\n"
+            + "\n".join(config_warnings)[:1800],
+        )
 
     if errors:
         post_discord(
