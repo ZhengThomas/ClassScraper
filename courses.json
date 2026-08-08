@@ -1,0 +1,15 @@
+{
+  "term": "1269",
+  "_comment": "term 1269 = Fall 2026. This is the sess= value from the classes.uwaterloo.ca URL. Change it each term. 'sections' is optional - omit it to watch every section of the course.",
+  "courses": [
+    {
+      "subject": "CS",
+      "catalog": "479"
+    },
+    {
+      "subject": "CS",
+      "catalog": "486",
+      "sections": ["001", "002"]
+    }
+  ]
+}

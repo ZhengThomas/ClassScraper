@@ -1,0 +1,43 @@
+name: Check course seats
+
+on:
+  schedule:
+    # Every hour, on the hour. GitHub's scheduler is best-effort and can be
+    # delayed during busy periods -- treat this as "roughly hourly".
+    - cron: "0 * * * *"
+  workflow_dispatch:  # lets you trigger a run manually from the Actions tab
+
+# Needed so the workflow can commit the updated state file back to the repo.
+permissions:
+  contents: write
+
+# Prevent overlapping runs from fighting over the state file.
+concurrency:
+  group: seat-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run monitor
+        env:
+          UW_API_KEY: ${{ secrets.UW_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python monitor.py
+
+      - name: Persist state
+        # Runs even if the monitor exited non-zero, so partial progress sticks.
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --staged --quiet || git commit -m "chore: update seat state [skip ci]"
+          git push
