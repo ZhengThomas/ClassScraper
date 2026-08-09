@@ -1,20 +1,51 @@
 {
+  "CS 456 1 (6085)": {
+    "capacity": 75,
+    "enrolled": 75,
+    "open": false,
+    "open_seats": 0
+  },
   "CS 479 1 (6763)": {
     "capacity": 59,
     "enrolled": 59,
     "open": false,
     "open_seats": 0
   },
-  "CS 479 101 (6771)": {
-    "capacity": 120,
-    "enrolled": 118,
-    "open": true,
-    "open_seats": 2
-  },
   "CS 479 2 (6764)": {
     "capacity": 60,
     "enrolled": 59,
     "open": true,
     "open_seats": 1
-  }
+  },
+  "CS 484 1 (7896)": {
+    "capacity": 68,
+    "enrolled": 69,
+    "open": false,
+    "open_seats": 0
+  },
+  "CS 486 2 (6264)": {
+    "capacity": 63,
+    "enrolled": 63,
+    "open": false,
+    "open_seats": 0
+  },
+  "EARTH 122 81 (7407)": {
+    "capacity": 400,
+    "enrolled": 400,
+    "open": false,
+    "open_seats": 0
+  },
+  "FINE 100 2 (3303)": {
+    "capacity": 25,
+    "enrolled": 25,
+    "open": false,
+    "open_seats": 0
+  },
+  "FINE 100 3 (8894)": {
+    "capacity": 25,
+    "enrolled": 25,
+    "open": false,
+    "open_seats": 0
+  },
+  "_config_warnings": []
 }
