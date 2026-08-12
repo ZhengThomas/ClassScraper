@@ -19,7 +19,7 @@
   },
   "CS 484 1 (7896)": {
     "capacity": 68,
-    "enrolled": 68,
+    "enrolled": 69,
     "open": false,
     "open_seats": 0
   },
@@ -31,9 +31,9 @@
   },
   "EARTH 122 81 (7407)": {
     "capacity": 400,
-    "enrolled": 399,
+    "enrolled": 397,
     "open": true,
-    "open_seats": 1
+    "open_seats": 3
   },
   "FINE 100 2 (3303)": {
     "capacity": 25,
