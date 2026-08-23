@@ -43,9 +43,9 @@
   },
   "FINE 100 3 (8894)": {
     "capacity": 25,
-    "enrolled": 25,
-    "open": false,
-    "open_seats": 0
+    "enrolled": 24,
+    "open": true,
+    "open_seats": 1
   },
   "_config_warnings": []
 }
