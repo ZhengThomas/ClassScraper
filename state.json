@@ -31,9 +31,9 @@
   },
   "EARTH 122 81 (7407)": {
     "capacity": 400,
-    "enrolled": 400,
-    "open": false,
-    "open_seats": 0
+    "enrolled": 399,
+    "open": true,
+    "open_seats": 1
   },
   "FINE 100 2 (3303)": {
     "capacity": 25,
