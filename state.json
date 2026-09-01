@@ -1,9 +1,9 @@
 {
   "CS 456 1 (6085)": {
     "capacity": 75,
-    "enrolled": 74,
-    "open": true,
-    "open_seats": 1
+    "enrolled": 75,
+    "open": false,
+    "open_seats": 0
   },
   "CS 479 1 (6763)": {
     "capacity": 59,
@@ -13,7 +13,7 @@
   },
   "CS 479 2 (6764)": {
     "capacity": 60,
-    "enrolled": 61,
+    "enrolled": 62,
     "open": false,
     "open_seats": 0
   },
