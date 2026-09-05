@@ -19,9 +19,9 @@
   },
   "CS 484 1 (7896)": {
     "capacity": 68,
-    "enrolled": 67,
-    "open": true,
-    "open_seats": 1
+    "enrolled": 68,
+    "open": false,
+    "open_seats": 0
   },
   "CS 486 2 (6264)": {
     "capacity": 63,
